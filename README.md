@@ -2,6 +2,12 @@
 
 easy timer loop controller.
 
+`to do list`
+
+* add goroutine pool
+
+* add more add func
+
 ### deps
 
 ```
