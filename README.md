@@ -1,4 +1,4 @@
-# timer_heap
+# timer_loop
 
 easy timer loop controller.
 
