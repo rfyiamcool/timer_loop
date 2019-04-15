@@ -11,7 +11,7 @@ easy timer loop controller.
 ### deps
 
 ```
-go get github.com/timer_loop
+go get github.com/rfyiamcool/timer_loop
 go get github.com/Sirupsen/logrus
 ```
 
@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	timerLoop "github.com/timer_loop"
+	timerLoop "github.com/rfyiamcool/timer_loop"
 )
 
 var (
@@ -59,6 +59,7 @@ func main() {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+
 	fmt.Println(timerCtl.GetLength())
 	fmt.Println("time cost: ", time.Now().Sub(start))
 }

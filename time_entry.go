@@ -1,4 +1,4 @@
-package main
+package timerLoop
 
 import (
 	"time"
@@ -6,12 +6,12 @@ import (
 
 type TimerEntry struct {
 	addSeq   uint
-	runTime  time.Time     // 到期时间
-	interval time.Duration // repeat的间隔
-	callback CallbackFunc  // 回调方法
-	taskId   string        // 业务ID
-	repeat   bool          // 是否重复执行
-	active   bool          // 任务状态
+	runTime  time.Time
+	interval time.Duration
+	callback CallbackFunc
+	taskID   string
+	repeat   bool
+	active   bool
 }
 
 func (t *TimerEntry) Cancel() {

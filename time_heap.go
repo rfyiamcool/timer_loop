@@ -1,4 +1,4 @@
-package main
+package timerLoop
 
 import (
 	"sync"
@@ -6,22 +6,26 @@ import (
 
 	"container/heap"
 	"runtime/debug"
-
-	"github.com/Sirupsen/logrus"
 )
 
 const (
-	MIN_TIMER = 1 * time.Millisecond // 最少的时间戳, 小于 1ms 没意义, cpu hz.
+	defaultMinDelay = 1 * time.Millisecond
 )
 
-var (
-	nextAddSeq uint = 1
+// null logger
+type loggerType func(tmpl string, s ...interface{})
 
-	logger *logrus.Logger
+func SetLogger(logger loggerType) {
+	defaultLogger = logger
+}
+
+var (
+	defaultLogger = func(tmpl string, s ...interface{}) {}
 )
 
 // time heap
 type TimerHeapHandler struct {
+	nextAddSeq        uint
 	timers            []*TimerEntry
 	locker            *sync.Mutex
 	TaskTimerEntryMap map[string]*TimerEntry
@@ -87,54 +91,54 @@ func (h *TimerHeapHandler) CancelById(id string) {
 	}
 }
 
-func (h *TimerHeapHandler) AddFuncWithId(d time.Duration, taskId string, callback CallbackFunc) *TimerEntry {
-	return h.addCallback(d,
+func (h *TimerHeapHandler) AddFuncWithID(delay time.Duration, taskID string, callback CallbackFunc) *TimerEntry {
+	return h.addCallback(
+		delay,
 		callback,
-		map[string]interface{}{
-			"TaskId": taskId,
-		})
+		taskID,
+		false,
+	)
 }
 
-func (h *TimerHeapHandler) AddCronFuncWithId(d time.Duration, taskId string, callback CallbackFunc) *TimerEntry {
-	return h.addCallback(d,
+func (h *TimerHeapHandler) AddCronFuncWithID(delay time.Duration, taskID string, callback CallbackFunc) *TimerEntry {
+	return h.addCallback(
+		delay,
 		callback,
-		map[string]interface{}{
-			"TaskId": taskId,
-			"Repeat": true,
-		})
+		taskID,
+		true,
+	)
 }
 
-func (h *TimerHeapHandler) addCallback(d time.Duration, callback CallbackFunc, argument map[string]interface{}) *TimerEntry {
+func (h *TimerHeapHandler) addCallback(delay time.Duration, callback CallbackFunc, taskID string, repeat bool) *TimerEntry {
 	h.locker.Lock()
 	defer h.locker.Unlock()
 
-	if d < MIN_TIMER {
-		d = MIN_TIMER
-	}
-	var taskId string
-	var repeat bool
-	if v, ok := argument["TaskId"]; ok {
-		taskId = v.(string)
+	if delay < defaultMinDelay {
+		delay = defaultMinDelay
 	}
 
-	if v, ok := argument["Repeat"]; ok {
-		repeat = v.(bool)
+	if taskID == "" {
+		taskID = makeTaskId()
 	}
 
 	t := &TimerEntry{
-		runTime:  time.Now().Add(d),
-		taskId:   taskId,
-		interval: d,
+		runTime:  time.Now().Add(delay),
+		taskID:   taskID,
+		interval: delay,
 		callback: callback,
 		repeat:   repeat,
 		active:   true,
 	}
-	t.addSeq = nextAddSeq // set addseq when locked
-	nextAddSeq += 1
+	// set seq
+	t.addSeq = h.nextAddSeq
+	h.nextAddSeq += 1
 
+	// push heap
 	heap.Push(h, t)
 
-	h.TaskTimerEntryMap[taskId] = t
+	// link registy
+	h.TaskTimerEntryMap[taskID] = t
+
 	return t
 }
 
@@ -154,8 +158,8 @@ func (h *TimerHeapHandler) EventLoop() {
 		}
 
 		t := heap.Pop(h).(*TimerEntry)
-		if t.taskId != "" {
-			delete(h.TaskTimerEntryMap, t.taskId)
+		if t.taskID != "" {
+			delete(h.TaskTimerEntryMap, t.taskID)
 		}
 
 		callback := t.callback
@@ -166,7 +170,6 @@ func (h *TimerHeapHandler) EventLoop() {
 		if !t.repeat {
 			t.callback = nil
 		}
-		// 减少在callback逻辑出阻塞.
 		h.locker.Unlock()
 
 		h.runCallback(callback) // don't use goroutine
@@ -177,8 +180,8 @@ func (h *TimerHeapHandler) EventLoop() {
 			if !t.runTime.After(now) {
 				t.runTime = now.Add(t.interval)
 			}
-			t.addSeq = nextAddSeq
-			nextAddSeq += 1
+			// t.addSeq = nextAddSeq
+			// nextAddSeq += 1
 			heap.Push(h, t)
 		}
 	}
@@ -198,21 +201,17 @@ func (h *TimerHeapHandler) runCallback(callback CallbackFunc) {
 	defer func() {
 		err := recover()
 		if err != nil {
-			if logger != nil {
-				logger.Warnf("Callback %v paniced: %v\n", callback, err)
-			}
+			defaultLogger("Callback %v paniced: %v\n", callback, err)
 			debug.PrintStack()
 		}
 	}()
+
 	if callback == nil {
 		// is not func
 		return
 	}
+
 	callback()
 }
 
 type CallbackFunc func()
-
-func SetLogger(cLogger *logrus.Logger) {
-	logger = cLogger
-}
