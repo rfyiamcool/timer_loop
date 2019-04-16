@@ -2,17 +2,10 @@
 
 easy timer loop controller.
 
-`to do list`
-
-* add goroutine pool
-
-* add more add func
-
-### deps
+### install
 
 ```
 go get github.com/rfyiamcool/timer_loop
-go get github.com/Sirupsen/logrus
 ```
 
 ### example
@@ -39,31 +32,29 @@ func init() {
 }
 
 func main() {
-	start := time.Now()
-	interval := 1000 * time.Millisecond
-	for i := 0; i < num; i++ {
-		timerCtl.AddFuncWithId(interval, string(i), func() {
-			atomic.AddInt64(&c, 1)
-		})
-		fmt.Println(timerCtl.GetLength())
-		// fmt.Println(timerCtl.TaskTimerEntryMap)
-		time.Sleep(1 * time.Second)
-	}
+	var (
+		start    = time.Now()
+		interval = 1000 * time.Millisecond
+	)
+
+	go func() {
+		for i := 0; i < num; i++ {
+			timerCtl.AddFuncWithID(interval, fmt.Sprintf("%d", i), func() {
+				atomic.AddInt64(&c, 1)
+			})
+		}
+	}()
 
 	for {
 		fmt.Println(timerCtl.GetLength())
 		if c == int64(num) {
-			fmt.Println(c)
 			break
 		} else {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 
-	fmt.Println(timerCtl.GetLength())
 	fmt.Println("time cost: ", time.Now().Sub(start))
 }
 
 ```
-
-
